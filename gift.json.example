@@ -1,0 +1,28 @@
+{
+  "network": "testnet-10",
+  "amountKas": 3,
+  "mode": "record-only",
+
+  "caps": {
+    "dailyKas": 300,
+    "poolFloorKas": 50
+  },
+
+  "apple": {
+    "enabled": false,
+    "teamId": "",
+    "bundleId": "com.kachat.app",
+    "keyId": "",
+    "keyFile": "/conf/apple/AuthKey.p8"
+  },
+
+  "android": {
+    "enabled": false,
+    "packageName": "com.kachat.app",
+    "serviceAccountFile": "/conf/google/service-account.json"
+  },
+
+  "kaspad": {
+    "url": "ws://kaspad:18110"
+  }
+}
