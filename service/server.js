@@ -147,6 +147,24 @@ async function claim(req, res) {
 const server = http.createServer(async (req, res) => {
     try {
         const url = new URL(req.url, 'http://gift');
+
+        // A friendly root, so anyone who opens the domain in a browser sees the
+        // service is alive and what it serves -- rather than the bare "No such
+        // endpoint." 404, which reads as "nothing here" when it means "not a
+        // route." The app never calls this; it is only for a human looking.
+        if (req.method === 'GET' && url.pathname === '/') {
+            return json(res, 200, {
+                ok: true,
+                service: 'kachat-gift',
+                message: 'The KaChat gift service is running. This root path is not an API endpoint.',
+                endpoints: {
+                    health: 'GET /healthz',
+                    status: 'GET /v1/status',
+                    claim: 'POST /v1/claim',
+                },
+            });
+        }
+
         if (req.method === 'GET' && url.pathname === '/healthz') return json(res, 200, { ok: true });
 
         if (req.method === 'GET' && url.pathname === '/v1/status') {
