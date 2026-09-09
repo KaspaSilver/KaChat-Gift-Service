@@ -103,6 +103,7 @@ Refusal (`{"ok":false,"reason":"..."}`), by status:
 | Status | When |
 |--------|------|
 | 400 | unknown platform, malformed address, or missing device/integrity token |
+| 429 | too many attempts from this IP -- back off and retry after a few minutes |
 | 403 | Android: the app or device did not pass Google's checks |
 | 409 | this address, or this iOS device, has already had its gift |
 | 502 | could not reach Apple/Google, or the payout itself failed (nothing sent) |

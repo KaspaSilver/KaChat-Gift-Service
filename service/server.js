@@ -45,6 +45,49 @@ async function readBody(req) {
 }
 
 /**
+ * A per-IP throttle on claims, independent of everything else.
+ *
+ * Attestation stops forgery and the ledger stops a repeat from the same device
+ * or address; this stops the crude case those do not -- an honest retry loop, or
+ * a script firing thousands of attempts from one connection to burn our Apple
+ * and Google quota and load the node, none of which need to succeed to cost us.
+ * It is defence in depth, not the enforcement: the real limits are still the
+ * attestation and the caps.
+ *
+ * Keyed on the real client, which nginx passes in X-Forwarded-For (the first
+ * entry is the original caller). A sliding window, swept so the map cannot grow
+ * without bound. Deliberately generous, so a carrier NAT with several real users
+ * behind one address is not caught while a flood from one is.
+ */
+const RATE_MAX = Number(process.env.GIFT_RATE_MAX ?? 20);
+const RATE_WINDOW_MS = Number(process.env.GIFT_RATE_WINDOW_MS ?? 5 * 60_000);
+const rateHits = new Map();
+
+function clientIp(req) {
+    const fwd = req.headers['x-forwarded-for'];
+    if (fwd) return String(fwd).split(',')[0].trim();
+    return req.socket?.remoteAddress ?? 'unknown';
+}
+
+function rateLimited(req) {
+    const now = Date.now();
+    const cutoff = now - RATE_WINDOW_MS;
+    const hits = (rateHits.get(clientIp(req)) ?? []).filter((t) => t > cutoff);
+    hits.push(now);
+    rateHits.set(clientIp(req), hits);
+    return hits.length > RATE_MAX;
+}
+
+setInterval(() => {
+    const cutoff = Date.now() - RATE_WINDOW_MS;
+    for (const [ip, hits] of rateHits) {
+        const live = hits.filter((t) => t > cutoff);
+        if (live.length) rateHits.set(ip, live);
+        else rateHits.delete(ip);
+    }
+}, RATE_WINDOW_MS).unref?.();
+
+/**
  * A Kaspa address, checked for shape before anything is done with it.
  *
  * Not a full validation -- the payer rejects a bad address on its own -- but
@@ -54,6 +97,13 @@ async function readBody(req) {
 const ADDRESS = /^kaspa(test)?:[a-z0-9]{50,90}$/;
 
 async function claim(req, res) {
+    // Cheapest possible refusal, before the body is even read: a flood from one
+    // connection is turned away without touching Apple, Google or the node.
+    if (rateLimited(req)) {
+        log('rate limited', clientIp(req));
+        return refuse(res, 429, 'Too many attempts from your connection. Wait a few minutes and try again.');
+    }
+
     const body = await readBody(req);
     const platform = String(body.platform ?? '');
     const address = String(body.address ?? '');
