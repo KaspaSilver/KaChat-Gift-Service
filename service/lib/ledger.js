@@ -102,4 +102,28 @@ export class Ledger {
             lastAt: claims.at(-1)?.at ?? null,
         };
     }
+
+    /**
+     * The most recent claims, newest first, for the operator's screen.
+     *
+     * The receiving address is never returned in the clear -- it is stored
+     * hashed, and the operator's questions ("how many, when, did it pay") do
+     * not need it. A short slice of that hash goes out as `ref` so distinct
+     * recipients can be told apart on screen without identifying anyone; the
+     * txid is on-chain already, so it is safe to show and links to the gift.
+     */
+    recent(limit = 100) {
+        return this.state.claims
+            .slice(-limit)
+            .reverse()
+            .map((c) => ({
+                at: c.at,
+                platform: c.platform,
+                amountKas: c.amountKas,
+                status: c.status,
+                txid: c.txid,
+                ref: String(c.address ?? '').slice(0, 12),
+                error: c.error ? String(c.error).slice(0, 200) : null,
+            }));
+    }
 }

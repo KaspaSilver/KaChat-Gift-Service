@@ -160,6 +160,7 @@ const server = http.createServer(async (req, res) => {
                 caps: config.caps,
                 platforms: { apple: Boolean(config.apple), android: Boolean(config.android) },
                 claims: ledger.summary(),
+                recent: ledger.recent(100),
             });
         }
 
