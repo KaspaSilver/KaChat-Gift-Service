@@ -114,19 +114,17 @@ async function claim(req, res) {
         }
     }
 
-    if (config.mode !== 'live') {
-        entry.settle(null);
-        log(`recorded a ${platform} claim for ${config.amountKas} KAS, not sent: the service is in record-only mode`);
-        return json(res, 200, {
-            ok: true,
-            sent: false,
-            amountKas: config.amountKas,
-            note: 'Recorded. This service is in record-only mode and has not sent anything.',
-        });
+    // A running service pays. Turning it off is how payouts are stopped, so
+    // there is no record-only branch -- only the case where no wallet has been
+    // funded yet, which is refused clearly rather than silently dropped.
+    if (!config.wallet) {
+        entry.fail('no sending wallet configured');
+        log(`refused a ${platform} claim: no sending wallet has been created yet`);
+        return refuse(res, 503, 'No gift wallet is set up yet. Try again shortly.');
     }
 
-    // Live: send the gift. The claim is already recorded (open, above), so a
-    // failed send is marked failed and nothing is paid twice.
+    // Send the gift. The claim is already recorded (open, above), so a failed
+    // send is marked failed and nothing is paid twice.
     try {
         const txid = await sendGift({
             privateKeyHex: config.wallet.privateKeyHex,
@@ -155,8 +153,8 @@ const server = http.createServer(async (req, res) => {
             return json(res, 200, {
                 ok: true,
                 network: config.network,
-                mode: config.mode,
                 amountKas: config.amountKas,
+                walletReady: Boolean(config.wallet),
                 caps: config.caps,
                 platforms: { apple: Boolean(config.apple), android: Boolean(config.android) },
                 claims: ledger.summary(),
@@ -175,7 +173,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
     log(`gift service on :${PORT}`);
     log(`network        : ${config.network}`);
-    log(`mode           : ${config.mode}${config.mode === 'live' ? '' : ' (records claims, sends nothing)'}`);
+    log(`wallet         : ${config.wallet ? config.wallet.address : 'none yet -- claims are refused until one is funded'}`);
     log(`gift           : ${config.amountKas} KAS, ceiling ${config.caps.dailyKas} KAS a day`);
     log(`platforms      : ${[config.apple && 'apple', config.android && 'android'].filter(Boolean).join(', ')}`);
 });

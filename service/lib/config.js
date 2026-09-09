@@ -22,9 +22,6 @@ export function load(file, { dataDir }) {
     const cfg = {
         network: raw.network ?? 'testnet-10',
         amountKas: Number(raw.amountKas ?? 3),
-        // record-only is the default on purpose: a first run should not be able
-        // to spend anything, whatever else is misconfigured.
-        mode: raw.mode === 'live' ? 'live' : 'record-only',
         caps: {
             dailyKas: Number(raw.caps?.dailyKas ?? 300),
             poolFloorKas: Number(raw.caps?.poolFloorKas ?? 50),
@@ -76,9 +73,12 @@ export function load(file, { dataDir }) {
         problems.push('Neither platform is switched on, so nothing could ever claim a gift.');
     }
 
-    // The wallet gifts are sent from. Only live mode spends, so record-only can
-    // run without one; live mode without a wallet is refused rather than
-    // started, so a real claim never fails at the money.
+    // The wallet gifts are sent from. The service always pays a valid claim
+    // when it is running -- turning the service off is how you stop payouts --
+    // so a missing or malformed key is validated here but does not stop the
+    // service starting: it starts, and a claim is refused at the money with a
+    // clear reason until a wallet is created and funded on the panel. That is
+    // gentler than refusing to start, which would read as a crash.
     let wallet = null;
     if (raw.wallet?.privateKeyHex) {
         if (!/^[0-9a-fA-F]{64}$/.test(raw.wallet.privateKeyHex)) {
@@ -90,9 +90,6 @@ export function load(file, { dataDir }) {
                 problems.push(`The wallet key could not be used: ${err.message}`);
             }
         }
-    }
-    if (cfg.mode === 'live' && !wallet) {
-        problems.push('Live mode needs a wallet to send from. Create one on the panel, or switch to record-only.');
     }
     cfg.wallet = wallet;
 

@@ -21,17 +21,17 @@ Operator/diagnostic view. No secrets. Example:
 {
   "ok": true,
   "network": "mainnet",
-  "mode": "record-only",
   "amountKas": 3,
+  "walletReady": true,
   "caps": { "dailyKas": 300, "poolFloorKas": 50 },
   "platforms": { "apple": true, "android": true },
   "claims": { "paid": 0, "failed": 0, "apple": 0, "android": 0, "paidTodayKas": 0, "lastAt": null }
 }
 ```
 
-`mode: "record-only"` means claims are verified and recorded but **nothing is
-sent**. A client still gets `{"ok":true,"sent":false,...}` for a valid claim.
-Real payouts happen only in `mode: "live"`.
+A running service pays a valid claim -- there is no record-only mode. Stopping
+payouts is done by switching the service off. `walletReady: false` means no
+sending wallet has been funded yet, so a claim is refused (503) until one is.
 
 ## POST /v1/claim
 
@@ -86,8 +86,7 @@ package name, and a verdict less than five minutes old.
 Success (HTTP 200):
 
 ```json
-{ "ok": true, "sent": true,  "amountKas": 3, "txid": "<hex>" }   // live
-{ "ok": true, "sent": false, "amountKas": 3, "note": "..." }      // record-only
+{ "ok": true, "sent": true, "amountKas": 3, "txid": "<hex>" }
 ```
 
 Refusal (`{"ok":false,"reason":"..."}`), by status:
@@ -98,7 +97,7 @@ Refusal (`{"ok":false,"reason":"..."}`), by status:
 | 403 | Android: the app or device did not pass Google's checks |
 | 409 | this address, or this iOS device, has already had its gift |
 | 502 | could not reach Apple/Google, or the payout itself failed (nothing sent) |
-| 503 | this platform is switched off here, or the daily ceiling is reached |
+| 503 | this platform is off, the daily ceiling is reached, or no sending wallet is funded yet |
 
 A client should treat any non-200 as "no gift this time" and show `reason`.
 

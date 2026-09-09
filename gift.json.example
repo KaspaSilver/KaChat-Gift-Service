@@ -1,7 +1,6 @@
 {
   "network": "testnet-10",
   "amountKas": 3,
-  "mode": "record-only",
 
   "wallet": { "privateKeyHex": "" },
 

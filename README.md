@@ -125,6 +125,5 @@ missing, rather than starting and failing at the first real claim.
 
 Early. The attestation, the ledger, the caps and the accounting are the parts
 worth reviewing first, because they are what stands between the pool and a
-script. Payouts are deliberately conservative: the service starts in a mode that
-records claims without sending anything, and paying for real is a decision the
-operator makes after testing on testnet-10.
+script. A running service pays a valid claim for real; stopping payouts is done
+by switching the service off. Test on testnet-10 before pointing it at mainnet.
