@@ -111,5 +111,37 @@ export async function verify(token, { packageName, serviceAccount, expectedReque
     const age = Date.now() - Number(request.timestampMillis ?? 0);
     if (!Number.isFinite(age) || age > 5 * 60_000) reasons.push('the verdict is older than five minutes');
 
-    return { ok: reasons.length === 0, reasons, verdict };
+    // Device recall (beta): a bit Google stores against the device that survives
+    // reinstall and reset -- Android's answer to Apple's DeviceCheck. We use the
+    // first of the three bits as "has had its gift". Absent when the feature is
+    // off in Play Console or the account is not Play-licensed, in which case
+    // bitFirst is undefined and this is simply not yet claimed by recall.
+    const alreadyClaimed = device.deviceRecall?.values?.bitFirst === true;
+
+    return { ok: reasons.length === 0, reasons, verdict, alreadyClaimed };
+}
+
+/**
+ * Marks this device as having claimed, by setting its first recall bit.
+ *
+ * Uses the same integrity token the claim arrived with (valid for 14 days) and
+ * the same service-account credentials as the decode. A ~30s propagation delay
+ * means a second attempt within that window may still read the bit unset; the
+ * ledger, the caps and the rate limit cover that gap. Throws on failure so the
+ * caller can log it -- the write is best-effort, not a reason to refuse a claim.
+ */
+export async function markRecall(token, { packageName, serviceAccount }) {
+    const res = await fetch(
+        `https://playintegrity.googleapis.com/v1/${encodeURIComponent(packageName)}/deviceRecall:write`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${await accessToken(serviceAccount)}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ integrityToken: token, newValues: { bitFirst: true } }),
+            signal: AbortSignal.timeout(15_000),
+        },
+    );
+    if (!res.ok) throw new Error(`device recall write ${res.status}: ${await res.text()}`);
 }

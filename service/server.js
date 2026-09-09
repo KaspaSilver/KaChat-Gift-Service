@@ -123,6 +123,7 @@ async function claim(req, res) {
 
     // --- the store round trip ----------------------------------------------
     let deviceToken = null;
+    let integrityToken = null;
     if (platform === 'apple') {
         deviceToken = String(body.deviceToken ?? '');
         if (!deviceToken) return refuse(res, 400, 'No device token.');
@@ -135,16 +136,22 @@ async function claim(req, res) {
             return refuse(res, 502, 'Could not check with Apple. Try again shortly.');
         }
     } else {
-        const token = String(body.integrityToken ?? '');
-        if (!token) return refuse(res, 400, 'No integrity token.');
+        integrityToken = String(body.integrityToken ?? '');
+        if (!integrityToken) return refuse(res, 400, 'No integrity token.');
         // Ties the verdict to this address, so a captured token cannot be
         // replayed to pay somebody else.
         const expectedRequestHash = crypto.createHash('sha256').update(address).digest('hex');
         try {
-            const verdict = await android.verify(token, { ...config.android, expectedRequestHash });
+            const verdict = await android.verify(integrityToken, { ...config.android, expectedRequestHash });
             if (!verdict.ok) {
                 log('android refused:', verdict.reasons.join('; '));
                 return refuse(res, 403, 'This app or device did not pass Google\'s checks.');
+            }
+            // Device recall, when enabled in Play Console, is the Android
+            // equivalent of Apple's DeviceCheck bit: it survives reinstall and
+            // reset. If it is already set, this device has had its gift.
+            if (verdict.alreadyClaimed) {
+                return refuse(res, 409, 'This device has already had its gift.');
             }
         } catch (err) {
             log('play integrity failed:', err.message);
@@ -161,6 +168,17 @@ async function claim(req, res) {
             entry.fail(`could not mark the device: ${err.message}`);
             log('apple mark failed:', err.message);
             return refuse(res, 502, 'Could not record the claim with Apple. Nothing was sent.');
+        }
+    } else {
+        // Set the device recall bit before paying, same order as Apple. Unlike
+        // Apple this is best-effort, not fatal: recall is a beta feature that
+        // may not be switched on in Play Console, in which case the write fails
+        // and the claim still stands on the address dedup, the caps and the
+        // rate limit. When it is on, this is what makes Android one-per-device.
+        try {
+            await android.markRecall(integrityToken, config.android);
+        } catch (err) {
+            log('device recall write failed (is it enabled in Play Console?):', err.message);
         }
     }
 

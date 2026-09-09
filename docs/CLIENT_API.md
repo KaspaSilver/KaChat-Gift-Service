@@ -85,9 +85,12 @@ replayed to pay a different address. The server also requires `PLAY_RECOGNIZED`,
 `MEETS_DEVICE_INTEGRITY`, a licensed account, the right package name, and a
 verdict less than five minutes old.
 
-> Note: Play Integrity does not persist a per-device mark across reinstalls the
-> way DeviceCheck does. On Android, repeat claims are bounded by the per-address
-> dedup, the daily ceiling and the pool floor, not prevented outright.
+> Note: with **device recall** enabled in Play Console (a Play Integrity beta),
+> the server records a per-device bit that survives reinstall and reset, so a
+> device that has already claimed is refused with `409` -- true one-per-device,
+> the Android equivalent of iOS DeviceCheck. Until recall is enabled, Android
+> leans on the per-address dedup, the daily ceiling, the pool floor and the
+> per-IP rate limit instead. See docs/ANDROID_SETUP.md to turn it on.
 
 ### Responses
 

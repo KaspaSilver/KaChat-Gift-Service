@@ -48,15 +48,48 @@ tidy up quietly.
 
 ## What the app has to do
 
+The request hash binds the verdict to this claim, so a replayed token cannot pay
+somebody else. It must be **`SHA-256(address)` as lowercase hex** -- the exact
+address string and nothing else -- because that is what the server recomputes.
+Not the raw address.
+
 ```kotlin
+val requestHash = MessageDigest.getInstance("SHA-256")
+    .digest(kaspaAddress.toByteArray(Charsets.UTF_8))
+    .joinToString("") { "%02x".format(it) }
+
 val manager = IntegrityManagerFactory.createStandard(context)
-// requestHash ties the verdict to this claim: use the receiving address, or a
-// replayed token can pay somebody else.
 manager.requestIntegrityToken(
-    StandardIntegrityTokenRequest.builder().setRequestHash(kaspaAddress).build()
+    StandardIntegrityTokenRequest.builder().setRequestHash(requestHash).build()
 )
 // POST { platform: "android", address: <kaspa address>, integrityToken: <token> }
 ```
 
-The service rejects a verdict whose request hash does not match the address it
-was asked to pay, and one older than five minutes.
+The service rejects a verdict whose request hash does not match, and one older
+than five minutes. The classic API works too: put the same hex value in the
+`nonce` instead. See CLIENT_API.md for the full contract.
+
+## Device recall: one gift per device (beta)
+
+Play Integrity on its own proves the app and device are genuine but forgets
+everything across a reinstall, so without this a determined user can reinstall
+and claim again (bounded only by the caps). Device recall is Google's answer to
+Apple's DeviceCheck: a bit stored against the device that survives reinstall and
+factory reset. With it on, the service reads that bit and refuses a device that
+has already been paid, and sets it after paying -- true one-per-device.
+
+To turn it on:
+
+1. Express interest in the beta and wait for approval:
+   <https://developer.android.com/google/play/integrity/device-recall>.
+2. Play Console -> your app -> **Protected with Play** -> **Play Integrity API**
+   -> **Manage** -> **Change responses** -> turn **Device recall** on -> Save.
+
+Nothing else is needed. The service reads `deviceIntegrity.deviceRecall` from the
+verdict and writes the bit back with the same service account, using the same
+integrity token (valid 14 days). It is best-effort: until the beta is approved
+and the toggle is on, recall is simply absent and Android falls back to the
+per-address dedup, the daily ceiling and the per-IP rate limit -- no claim
+breaks. The account must be Play-licensed for a recall verdict to be evaluated,
+and there is a propagation delay of up to ~30 seconds between writing the bit and
+reading it back.
