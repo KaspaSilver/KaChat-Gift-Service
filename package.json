@@ -6,5 +6,7 @@
   "description": "Gives a new KaChat user their first 3 KAS, once, against Apple and Google attestation.",
   "license": "MIT",
   "engines": { "node": ">=22" },
-  "dependencies": {}
+  "dependencies": {
+    "kaspa-wasm": "0.13.0"
+  }
 }

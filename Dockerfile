@@ -14,6 +14,9 @@ COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund
 
 COPY service ./service
+# Wallet generator, run on its own by the control panel (node gen-wallet.js) to
+# create the sending wallet with the same SDK the payout uses.
+COPY gen-wallet.js ./
 
 ENV NODE_ENV=production \
     GIFT_PORT=8770 \

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { walletAddress } from './payer.js';
 
 /**
  * Reads the configuration and the secrets it points at, and refuses to start
@@ -74,6 +75,26 @@ export function load(file, { dataDir }) {
     if (!cfg.apple && !cfg.android) {
         problems.push('Neither platform is switched on, so nothing could ever claim a gift.');
     }
+
+    // The wallet gifts are sent from. Only live mode spends, so record-only can
+    // run without one; live mode without a wallet is refused rather than
+    // started, so a real claim never fails at the money.
+    let wallet = null;
+    if (raw.wallet?.privateKeyHex) {
+        if (!/^[0-9a-fA-F]{64}$/.test(raw.wallet.privateKeyHex)) {
+            problems.push('wallet.privateKeyHex must be 64 hexadecimal characters.');
+        } else {
+            try {
+                wallet = { privateKeyHex: raw.wallet.privateKeyHex, address: walletAddress(raw.wallet.privateKeyHex, cfg.network) };
+            } catch (err) {
+                problems.push(`The wallet key could not be used: ${err.message}`);
+            }
+        }
+    }
+    if (cfg.mode === 'live' && !wallet) {
+        problems.push('Live mode needs a wallet to send from. Create one on the panel, or switch to record-only.');
+    }
+    cfg.wallet = wallet;
 
     if (problems.length) {
         throw new Error(`The gift service cannot start:\n  - ${problems.join('\n  - ')}`);

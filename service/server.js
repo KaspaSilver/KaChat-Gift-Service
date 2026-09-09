@@ -4,6 +4,7 @@ import { load } from './lib/config.js';
 import { Ledger } from './lib/ledger.js';
 import * as apple from './lib/apple.js';
 import * as android from './lib/android.js';
+import { sendGift } from './lib/payer.js';
 
 /**
  * The gift service.
@@ -124,11 +125,25 @@ async function claim(req, res) {
         });
     }
 
-    // Live payouts are deliberately not wired up yet. The service refuses
-    // rather than pretending, and the claim is left recorded so the operator
-    // can see what would have gone out.
-    entry.fail('live payouts are not implemented yet');
-    return refuse(res, 501, 'This service cannot send yet.');
+    // Live: send the gift. The claim is already recorded (open, above), so a
+    // failed send is marked failed and nothing is paid twice.
+    try {
+        const txid = await sendGift({
+            privateKeyHex: config.wallet.privateKeyHex,
+            network: config.network,
+            kaspadUrl: config.kaspad.url,
+            toAddress: address,
+            amountKas: config.amountKas,
+            poolFloorKas: config.caps.poolFloorKas,
+        });
+        entry.settle(txid);
+        log(`sent ${config.amountKas} KAS to ${address}: ${txid}`);
+        return json(res, 200, { ok: true, sent: true, amountKas: config.amountKas, txid });
+    } catch (err) {
+        entry.fail(err.message);
+        log('payout failed:', err.message);
+        return refuse(res, 502, 'Could not send the gift right now. Nothing was sent.');
+    }
 }
 
 const server = http.createServer(async (req, res) => {
