@@ -87,7 +87,16 @@ export async function verify(token, { packageName, serviceAccount, expectedReque
 
     const reasons = [];
     if (request.requestPackageName !== packageName) reasons.push('the verdict is for a different package');
-    if (expectedRequestHash && request.requestHash !== expectedRequestHash) {
+    // The client binds the token to this claim by putting SHA-256(address), as
+    // lowercase hex, into the request. Play Integrity surfaces that value as
+    // `requestHash` on the standard API and `nonce` on the classic one, so
+    // accept it in either field -- the binding is what matters, not which API
+    // produced it. A token carrying neither is treated as unbound and rejected.
+    if (
+        expectedRequestHash &&
+        request.requestHash !== expectedRequestHash &&
+        request.nonce !== expectedRequestHash
+    ) {
         reasons.push('the verdict does not match this request, so it may be replayed');
     }
     if (app.appRecognitionVerdict !== 'PLAY_RECOGNIZED') {

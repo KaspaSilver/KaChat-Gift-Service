@@ -66,16 +66,24 @@ survives reinstall/restore/wipe -- that is the one-gift-per-device guarantee.
 This service uses **Play Integrity**. The old `api.kachat.app` had no Android
 branch; this one does.
 
-1. Compute `requestHash = SHA-256(address)` as **lowercase hex**.
-2. Request a Play Integrity token with that `requestHash`.
-3. Send it as `integrityToken`, with `platform: "android"` and the same
+1. Compute the binding value **`SHA-256(address)` as lowercase hex** (a 64-char
+   `[0-9a-f]` string). The input is the **exact `address` string** you send in
+   the claim, and **nothing else** -- no device id, no colon, no concatenation.
+   `sha256("kaspa:qr2h…")`, not `sha256("kaspa:qr2h…:someDeviceId")`.
+2. Put that value in the Play Integrity request's binding field, then send the
+   returned token as `integrityToken` with `platform: "android"` and the same
    `address`.
+3. Either Play Integrity API is fine: on the **standard** API it is the
+   `requestHash`; on the **classic** API it is the `nonce`. The server accepts
+   the value in **either** `requestDetails.requestHash` **or**
+   `requestDetails.nonce`, so use whichever flow you already have -- only the
+   value has to match.
 
-The `requestHash` binding is required: the server recomputes `SHA-256(address)`
-and rejects a token whose `requestHash` does not match, so a captured token
-cannot be replayed to pay a different address. The server also requires
-`PLAY_RECOGNIZED`, `MEETS_DEVICE_INTEGRITY`, a licensed account, the right
-package name, and a verdict less than five minutes old.
+The binding is required: the server recomputes `SHA-256(address)` and rejects a
+token whose bound value matches neither field, so a captured token cannot be
+replayed to pay a different address. The server also requires `PLAY_RECOGNIZED`,
+`MEETS_DEVICE_INTEGRITY`, a licensed account, the right package name, and a
+verdict less than five minutes old.
 
 > Note: Play Integrity does not persist a per-device mark across reinstalls the
 > way DeviceCheck does. On Android, repeat claims are bounded by the per-address
@@ -83,7 +91,8 @@ package name, and a verdict less than five minutes old.
 
 ### Responses
 
-Success (HTTP 200):
+Success (HTTP 200). The transaction id field is exactly **`txid`** (lowercase),
+a hex string -- not `txId`, `transactionId`, or anything else:
 
 ```json
 { "ok": true, "sent": true, "amountKas": 3, "txid": "<hex>" }
