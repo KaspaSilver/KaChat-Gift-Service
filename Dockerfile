@@ -10,7 +10,10 @@ RUN apk add --no-cache ca-certificates tini \
     && chown -R gift:gift /data /home/gift
 
 WORKDIR /app
+# vendor/ holds the official Kaspa v2.x WASM SDK (kaspa-wasm), referenced from
+# package.json as a file: dependency, so it must be present before npm install.
 COPY package.json ./
+COPY vendor ./vendor
 RUN npm install --omit=dev --no-audit --no-fund
 
 COPY service ./service

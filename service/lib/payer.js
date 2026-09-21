@@ -1,4 +1,9 @@
-import kaspa from 'kaspa-wasm';
+// The Kaspa WASM SDK ships as a CommonJS wasm-bindgen module that does not load
+// cleanly via ESM `import`, so pull it in through createRequire. It is the
+// official v2.x SDK (vendored under vendor/kaspa-wasm), matched to the node.
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const kaspa = require('kaspa-wasm');
 
 const { RpcClient, Encoding, PrivateKey, createTransactions, kaspaToSompi } = kaspa;
 
@@ -26,16 +31,20 @@ export async function sendGift({ privateKeyHex, network, kaspadUrl, toAddress, a
     // Port 17110 is wRPC Borsh, 18110 is JSON; match the encoding to the URL so
     // the client speaks what the node is listening for.
     const encoding = kaspadUrl.includes('17110') ? Encoding.Borsh : Encoding.SerdeJson;
-    const rpc = new RpcClient(kaspadUrl, encoding, network);
-    await rpc.connect({});
+    // v2.x RpcClient takes a single config object (was positional in older SDKs).
+    const rpc = new RpcClient({ url: kaspadUrl, encoding, networkId: network });
+    await rpc.connect();
     try {
-        const resp = await rpc.getUtxosByAddresses({ addresses: [fromAddress] });
+        // v2.x getUtxosByAddresses takes an address array and returns { entries };
+        // the entries must be passed to createTransactions unmodified (they carry
+        // live SDK handles).
+        const resp = await rpc.getUtxosByAddresses([fromAddress]);
         const entries = resp?.entries ?? [];
         if (entries.length === 0) throw new Error('the gift wallet has no funds');
 
         const amountSompi = kaspaToSompi(amountKas);
         const floorSompi = kaspaToSompi(poolFloorKas);
-        const balanceSompi = entries.reduce((sum, e) => sum + BigInt(e?.utxoEntry?.amount ?? e?.amount ?? 0), 0n);
+        const balanceSompi = entries.reduce((sum, e) => sum + BigInt(e?.amount ?? e?.utxoEntry?.amount ?? 0), 0n);
         if (balanceSompi - amountSompi < floorSompi) {
             throw new Error('paying this would drop the pool below its floor');
         }

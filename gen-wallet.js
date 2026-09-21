@@ -4,7 +4,9 @@
 //
 //   node gen-wallet.js --network mainnet            -> {privateKeyHex, address}
 //   node gen-wallet.js --network X --from-key <hex> -> {address}  (derive only)
-import kaspa from 'kaspa-wasm';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const kaspa = require('kaspa-wasm');
 
 const { Keypair, PrivateKey } = kaspa;
 

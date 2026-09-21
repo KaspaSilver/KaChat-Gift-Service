@@ -5,8 +5,10 @@
   "type": "module",
   "description": "Gives a new KaChat user their first 3 KAS, once, against Apple and Google attestation.",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
-    "kaspa-wasm": "0.13.0"
+    "kaspa-wasm": "file:vendor/kaspa-wasm"
   }
 }
